@@ -1,0 +1,27 @@
+# ESPHome / build output
+.esphome/
+*.esphome/
+esphome/secrets.yaml
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build artefacts
+*.elf
+*.map
+build/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

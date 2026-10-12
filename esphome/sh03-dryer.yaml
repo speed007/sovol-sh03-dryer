@@ -1,0 +1,533 @@
+# =====================================================================
+#  Sovol - Comgrow SH03 filament dryer -> Home Assistant   (ESP32-C3, ESPHome)
+# ---------------------------------------------------------------------
+#  Per chamber (Ch1 / Ch2) you get:
+#    - select  "ChN Material"  PLA/PET/PC/PP/PA/ASA/PIA/TPU/ABS/PETG
+#    - switch  "ChN Drying"    on = start with the selected material
+#                              off = stop
+#
+#  Changing the material select while that chamber is drying re-applies
+#  the new material on that chamber only; the other chamber is untouched.
+#  Changing it while idle just stores the choice for the next start.
+#
+#  All key presses go through ONE queued script, so two automations
+#  firing at once (e.g. Ch1 + Ch2) run one after another instead of
+#  fighting over the single UART / touch line.
+#
+#  Wiring (ESP32-C3):
+#    GPIO4 (TX) -> J3 RX      GPIO5 (RX) <- J3 TX (debug log, optional)
+#    GPIO6      -> PA3 (via ~1k series resistor)
+#    GND        -> GND
+#
+#  secrets.yaml needs: wifi_ssid, wifi_password, api_key, ap_password
+# =====================================================================
+
+substitutions:
+  name: sh03-dryer
+  friendly_name: SH03 Dryer
+
+  # Touch codes sent on the UART
+  k_chamber: "0xE7"    # Key 1: switch chamber
+  k_settings: "0xF7"   # Key 2: material menu
+  k_up: "0xFB"         # Key 3
+  k_down: "0xF9"       # Key 4
+  k_ok: "0xFC"         # Key 5: start / end
+
+  # Timing
+  touch_pulse: 60ms    # PA3 low pulse length
+  key_gap: 500ms       # wait after every key (lower = faster, less safe)
+
+  # Key 1 presses needed to reach each chamber when the ESP does NOT know
+  # which chamber is focused (e.g. right after boot). Your original values.
+  # If chambers come out swapped, try 3 and 2 (or tell the ESP the real focus
+  # with the "Focus is Ch1/Ch2" buttons or the sh03_set_focus action).
+  cold_presses_ch1: "2"
+  cold_presses_ch2: "3"
+
+  # Default drying time in hours per material, in menu order:
+  #   PLA, PET, PC, PP, PA, ASA, PIA, TPU, ABS, PETG
+  # 0 = unknown: the ESP will not auto-clear that chamber.
+  dry_hours: "8, 12, 12, 8, 12, 12, 8, 8, 12, 8"
+
+  # The dryer's screens go blank in standby and focus falls back to the
+  # standby default (Ch1). If both chambers are idle and no key has been sent
+  # for this long, the ESP forgets the focus and uses the cold-boot presses.
+  # MEASURE this: how long after the last touch does the screen go blank?
+  screen_timeout_ms: "30000"
+
+  # How to change material on a chamber that is already drying.
+  # Default mirrors the physical flow: focus chamber -> Key 2 (settings)
+  # -> Key 3/4 to find the material -> Key 5 to activate. No stop needed.
+  #   "false" -> live change (as above)
+  #   "true"  -> fallback: stop, then start again with the new material
+  restart_on_change: "false"
+  live_confirm: "0xFC"   # Key 5 activates the new material
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100   # after all entities have been set up and restored
+    then:
+      # The ESP is powered by the dryer, so a power cycle resets BOTH to
+      # defaults (PLA, idle). The flash-restored values are stale then and
+      # must be thrown away. A software reset (OTA, crash, wifi watchdog)
+      # leaves the dryer running, so the restored values are kept.
+      # Make sure PA3 is released (open-drain high-Z) after boot
+      - output.turn_off: touch_int
+      # Only a known SOFTWARE reset keeps the restored state. Anything else
+      # (power-on, brownout, power glitch, unknown) counts as a dryer power cycle.
+      - lambda: |-
+          auto r = esp_reset_reason();
+          bool warm = (r == ESP_RST_SW || r == ESP_RST_PANIC || r == ESP_RST_INT_WDT ||
+                       r == ESP_RST_TASK_WDT || r == ESP_RST_WDT);
+          ESP_LOGW("sh03", "Reset reason %d -> %s", (int) r,
+                   warm ? "software reset, keeping restored state"
+                        : "dryer power-cycled, resetting state to PLA/idle");
+          if (!warm) {
+            id(pos_ch1) = 0;  id(pos_ch2) = 0;
+            id(running_ch1) = false;  id(running_ch2) = false;
+            id(end_ts_ch1) = 0;  id(end_ts_ch2) = 0;
+            id(focus_ch) = 0;
+          }
+      - if:
+          condition:
+            lambda: |-
+              auto r = esp_reset_reason();
+              return !(r == ESP_RST_SW || r == ESP_RST_PANIC || r == ESP_RST_INT_WDT ||
+                       r == ESP_RST_TASK_WDT || r == ESP_RST_WDT);
+          then:
+            - select.set_index:
+                id: ch1_material
+                index: 0
+            - select.set_index:
+                id: ch2_material
+                index: 0
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32C3_WIFI_AUTH_WPA2_PSK: y
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_key
+  actions:
+    # Start a chamber with a given material (0=PLA ... 9=PETG).
+    # If it is already drying, this switches its material instead.
+    - action: sh03_start
+      variables:
+        chamber: int
+        material: int
+      then:
+        - if:
+            condition:
+              lambda: "return chamber == 1;"
+            then:
+              - select.set_index:
+                  id: ch1_material
+                  index: !lambda "return material;"
+            else:
+              - select.set_index:
+                  id: ch2_material
+                  index: !lambda "return material;"
+        - script.execute:
+            id: run_job
+            action: 0
+            chamber: !lambda "return chamber;"
+            arg: !lambda "return material;"
+
+    - action: sh03_stop
+      variables:
+        chamber: int
+      then:
+        - script.execute:
+            id: run_job
+            action: 1
+            chamber: !lambda "return chamber;"
+            arg: 0
+
+    # Tell the ESP which chamber the touchscreen is focused on right now
+    # (1 or 2; 0 = unknown). Does not press anything.
+    - action: sh03_set_focus
+      variables:
+        chamber: int
+      then:
+        - lambda: "id(focus_ch) = chamber;"
+
+    # Tell the ESP what the dryer is really doing (after using the
+    # physical touchscreen, a power cycle of the dryer, etc.)
+    - action: sh03_resync
+      variables:
+        chamber: int
+        material: int
+        running: bool
+      then:
+        - lambda: |-
+            if (chamber == 1) { id(pos_ch1) = material; id(running_ch1) = running; id(end_ts_ch1) = 0; }
+            else              { id(pos_ch2) = material; id(running_ch2) = running; id(end_ts_ch2) = 0; }
+        - if:
+            condition:
+              lambda: "return chamber == 1;"
+            then:
+              - select.set_index:
+                  id: ch1_material
+                  index: !lambda "return material;"
+            else:
+              - select.set_index:
+                  id: ch2_material
+                  index: !lambda "return material;"
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: 192.168.103.165
+    gateway: 192.168.103.1
+    subnet: 255.255.255.0
+  output_power: 8.5dBm
+  power_save_mode: NONE
+  ap:
+    ssid: SH03 Dryer Fallback Hotspot
+    password: !secret ap_password
+
+captive_portal:
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+# Auto-clear a chamber when its default drying time has passed
+interval:
+  - interval: 30s
+    then:
+      - lambda: |-
+          auto t = id(ha_time).now();
+          if (!t.is_valid()) return;
+          const uint32_t now = (uint32_t) t.timestamp;
+          if (id(running_ch1) && id(end_ts_ch1) != 0 && now >= id(end_ts_ch1)) {
+            ESP_LOGI("sh03", "Ch1 cycle finished");
+            id(running_ch1) = false;
+            id(end_ts_ch1) = 0;
+          }
+          if (id(running_ch2) && id(end_ts_ch2) != 0 && now >= id(end_ts_ch2)) {
+            ESP_LOGI("sh03", "Ch2 cycle finished");
+            id(running_ch2) = false;
+            id(end_ts_ch2) = 0;
+          }
+
+sensor:
+  - platform: template
+    name: "Ch1 Finishes At"
+    device_class: timestamp
+    update_interval: 30s
+    lambda: |-
+      if (!id(running_ch1) || id(end_ts_ch1) == 0) return NAN;
+      return (float) id(end_ts_ch1);
+  - platform: template
+    name: "Ch2 Finishes At"
+    device_class: timestamp
+    update_interval: 30s
+    lambda: |-
+      if (!id(running_ch2) || id(end_ts_ch2) == 0) return NAN;
+      return (float) id(end_ts_ch2);
+
+uart:
+  id: uart_j3
+  tx_pin: GPIO4
+  rx_pin: GPIO5
+  baud_rate: 115200
+
+output:
+  - platform: gpio
+    id: touch_int
+    pin:
+      number: GPIO6
+      mode: OUTPUT_OPEN_DRAIN
+    inverted: true
+
+# ---------------------------------------------------------------------
+#  State the ESP has to track (the dryer gives no readback)
+#  pos_chN      = material currently shown in that chamber's menu
+#  running_chN  = chamber is drying
+#  focus_ch     = chamber the touchscreen is focused on (0 = unknown)
+#  plan         = key sequence for the job currently executing
+# ---------------------------------------------------------------------
+globals:
+  - id: pos_ch1
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: pos_ch2
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: running_ch1
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: running_ch2
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: focus_ch
+    type: int
+    initial_value: "0"
+  - id: last_key_ms
+    type: uint32_t
+    initial_value: "0"
+  # Unix time when the current cycle should end (0 = unknown / not running)
+  - id: end_ts_ch1
+    type: uint32_t
+    restore_value: true
+    initial_value: "0"
+  - id: end_ts_ch2
+    type: uint32_t
+    restore_value: true
+    initial_value: "0"
+  - id: just_started
+    type: int
+    initial_value: "0"
+  - id: plan
+    type: std::vector<int>
+
+script:
+  # action: 0 = start, 1 = stop, 2 = change material (only if drying),
+  #         3 = raw key press (arg = key code)
+  # chamber: 1 or 2     arg: material index 0-9 (or key code for action 3)
+  - id: run_job
+    mode: queued
+    max_runs: 20
+    parameters:
+      action: int
+      chamber: int
+      arg: int
+    then:
+      # 1) Work out which keys to press and update tracked state
+      - lambda: |-
+          auto &p = id(plan);
+          p.clear();
+          id(just_started) = 0;
+          const int kCh = ${k_chamber}, kSet = ${k_settings};
+          const int kUp = ${k_up}, kDown = ${k_down}, kOk = ${k_ok};
+
+          // Standby: both chambers idle and the screen has had time to blank,
+          // so the focus is back to the standby default -> treat as unknown.
+          if (!id(running_ch1) && !id(running_ch2) &&
+              (millis() - id(last_key_ms)) > (uint32_t) ${screen_timeout_ms}) {
+            if (id(focus_ch) != 0) ESP_LOGI("sh03", "Screen timed out, forgetting focus");
+            id(focus_ch) = 0;
+          }
+
+          if (action == 3) {                       // raw key
+            p.push_back(arg);
+            if (arg == kCh) id(focus_ch) = (id(focus_ch) == 1) ? 2 : 1;
+            return;
+          }
+
+          const int ch = chamber;
+          int &pos = (ch == 1) ? id(pos_ch1) : id(pos_ch2);
+          bool &run = (ch == 1) ? id(running_ch1) : id(running_ch2);
+          uint32_t &endts = (ch == 1) ? id(end_ts_ch1) : id(end_ts_ch2);
+          const int mat = std::max(0, std::min(9, arg));
+
+          // Focus the right chamber (cold boot needs the extra presses)
+          auto focus = [&]() {
+            if (id(focus_ch) == 0) {
+              for (int i = 0; i < ((ch == 1) ? ${cold_presses_ch1} : ${cold_presses_ch2}); i++) p.push_back(kCh);
+            } else if (id(focus_ch) != ch) {
+              p.push_back(kCh);
+            }
+            id(focus_ch) = ch;
+          };
+          // Open the material menu and step to material m
+          auto pick = [&](int m) {
+            p.push_back(kSet);
+            while (pos < m) { p.push_back(kDown); pos++; }
+            while (pos > m) { p.push_back(kUp);   pos--; }
+          };
+          // Stop sequence: Key1 x2 -> Key5
+          auto stop = [&]() {
+            focus();
+            p.push_back(kCh); p.push_back(kCh); p.push_back(kOk);
+            run = false;
+            endts = 0;
+          };
+
+          if (action == 1) {
+            if (run) stop();
+            else ESP_LOGW("sh03", "Ch%d is not drying, stop ignored", ch);
+            return;
+          }
+
+          // start (0) or change (2)
+          if (run && pos == mat) {
+            ESP_LOGI("sh03", "Ch%d already on material %d", ch, mat);
+            return;
+          }
+          if (!run) {
+            if (action == 2) return;               // idle: selection only
+            focus(); pick(mat); p.push_back(kOk); run = true;
+          } else if (${restart_on_change}) {
+            stop(); pick(mat); p.push_back(kOk); run = true;
+          } else {
+            focus(); pick(mat); p.push_back(${live_confirm});
+          }
+          // A (new) cycle begins: the end time is set after the keys are sent
+          endts = 0;
+          id(just_started) = ch;
+          ESP_LOGI("sh03", "Ch%d -> material %d (%d keys)", ch, mat, (int) p.size());
+
+      # 2) Send the keys
+      - repeat:
+          count: !lambda "return id(plan).size();"
+          then:
+            - uart.write: !lambda "return std::vector<uint8_t>{(uint8_t) id(plan)[iteration]};"
+            - output.turn_on: touch_int
+            - delay: ${touch_pulse}
+            - output.turn_off: touch_int
+            - delay: ${key_gap}
+      # 3) Remember when the screen was last touched, and when a cycle that
+      #    just started will finish (default duration of its material)
+      - lambda: |-
+          if (!id(plan).empty()) id(last_key_ms) = millis();
+          const int ch = id(just_started);
+          if (ch != 0) {
+            static const int kHours[10] = {${dry_hours}};
+            const int pos = (ch == 1) ? id(pos_ch1) : id(pos_ch2);
+            uint32_t &endts = (ch == 1) ? id(end_ts_ch1) : id(end_ts_ch2);
+            auto t = id(ha_time).now();
+            if (t.is_valid() && pos >= 0 && pos < 10 && kHours[pos] > 0) {
+              endts = (uint32_t) t.timestamp + (uint32_t) kHours[pos] * 3600U;
+              ESP_LOGI("sh03", "Ch%d expected to finish in %d h", ch, kHours[pos]);
+            } else {
+              endts = 0;
+              ESP_LOGW("sh03", "Ch%d: no end time (time not synced or duration unknown)", ch);
+            }
+            id(just_started) = 0;
+          }
+
+select:
+  - platform: template
+    id: ch1_material
+    name: "Ch1 Material"
+    icon: mdi:printer-3d-nozzle
+    options: [PLA, PET, PC, PP, PA, ASA, PIA, TPU, ABS, PETG]
+    initial_option: PLA
+    optimistic: true
+    restore_value: true
+    set_action:
+      - if:
+          condition:
+            lambda: "return id(running_ch1);"
+          then:
+            - script.execute:
+                id: run_job
+                action: 2
+                chamber: 1
+                arg: !lambda "return id(ch1_material).index_of(x).value_or(0);"
+
+  - platform: template
+    id: ch2_material
+    name: "Ch2 Material"
+    icon: mdi:printer-3d-nozzle
+    options: [PLA, PET, PC, PP, PA, ASA, PIA, TPU, ABS, PETG]
+    initial_option: PLA
+    optimistic: true
+    restore_value: true
+    set_action:
+      - if:
+          condition:
+            lambda: "return id(running_ch2);"
+          then:
+            - script.execute:
+                id: run_job
+                action: 2
+                chamber: 2
+                arg: !lambda "return id(ch2_material).index_of(x).value_or(0);"
+
+switch:
+  - platform: template
+    name: "Ch1 Drying"
+    icon: mdi:air-filter
+    lambda: "return id(running_ch1);"
+    turn_on_action:
+      - script.execute:
+          id: run_job
+          action: 0
+          chamber: 1
+          arg: !lambda "return id(ch1_material).active_index().value_or(0);"
+    turn_off_action:
+      - script.execute:
+          id: run_job
+          action: 1
+          chamber: 1
+          arg: 0
+
+  - platform: template
+    name: "Ch2 Drying"
+    icon: mdi:air-filter
+    lambda: "return id(running_ch2);"
+    turn_on_action:
+      - script.execute:
+          id: run_job
+          action: 0
+          chamber: 2
+          arg: !lambda "return id(ch2_material).active_index().value_or(0);"
+    turn_off_action:
+      - script.execute:
+          id: run_job
+          action: 1
+          chamber: 2
+          arg: 0
+
+# Manual keys for testing / recovery (shown under Diagnostic in HA)
+button:
+  - platform: template
+    name: "Key 1 (Chamber)"
+    entity_category: diagnostic
+    on_press:
+      - script.execute: {id: run_job, action: 3, chamber: 0, arg: 0xE7}
+  - platform: template
+    name: "Key 2 (Settings)"
+    entity_category: diagnostic
+    on_press:
+      - script.execute: {id: run_job, action: 3, chamber: 0, arg: 0xF7}
+  - platform: template
+    name: "Key 3 (Up)"
+    entity_category: diagnostic
+    on_press:
+      - script.execute: {id: run_job, action: 3, chamber: 0, arg: 0xFB}
+  - platform: template
+    name: "Key 4 (Down)"
+    entity_category: diagnostic
+    on_press:
+      - script.execute: {id: run_job, action: 3, chamber: 0, arg: 0xF9}
+  - platform: template
+    name: "Key 5 (Start or End)"
+    entity_category: diagnostic
+    on_press:
+      - script.execute: {id: run_job, action: 3, chamber: 0, arg: 0xFC}
+  - platform: template
+    name: "Focus is Ch1"
+    entity_category: diagnostic
+    on_press:
+      - lambda: "id(focus_ch) = 1;"
+  - platform: template
+    name: "Focus is Ch2"
+    entity_category: diagnostic
+    on_press:
+      - lambda: "id(focus_ch) = 2;"
+  - platform: template
+    name: "Reset Chamber Focus Tracking"
+    entity_category: diagnostic
+    on_press:
+      - lambda: "id(focus_ch) = 0;"
