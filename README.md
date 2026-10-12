@@ -60,7 +60,8 @@ python3 -m pyocd flash -t gd32f303cc sh03_stock_patched.bin
 Keep `sh03_stock.bin` — it's your recovery image. Full step-by-step (SWD wiring,
 verification, roll-your-own): **[docs/FLASHING.md](docs/FLASHING.md)**.
 
-**2 — ESP32.** Ordinary ESPHome:
+**2 — ESP32.** Ordinary ESPHome (a static IP is set in the config — worth
+keeping on cloned C3 minis, whose WiFi is often marginal):
 
 ```bash
 cd esphome

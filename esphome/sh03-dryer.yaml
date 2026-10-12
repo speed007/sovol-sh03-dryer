@@ -189,9 +189,13 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # Static IP is deliberate, not just convenience. Many cloned ESP32-C3 mini
+  # boards have marginal WiFi; skipping the DHCP handshake lets the node come
+  # up faster and stay associated, which is noticeably more reliable on them.
+  # Set these to suit your own LAN (or delete the block to use DHCP).
   manual_ip:
-    static_ip: 192.168.103.165
-    gateway: 192.168.103.1
+    static_ip: 192.168.1.50
+    gateway: 192.168.1.1
     subnet: 255.255.255.0
   output_power: 8.5dBm
   power_save_mode: NONE
