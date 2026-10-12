@@ -1,9 +1,9 @@
 # Flashing the dryer firmware
 
 The SH03's own firmware has to be patched before it will accept touch codes over
-the `J3` UART. This is a **one-off** step. Use the ready-made image in
-`firmware/patched/` — you do **not** need a CH340 or any reverse-engineering
-tools for this.
+the `J3` UART. This is a **one-off** step, and you do it to **your own dump** —
+this repository ships no vendor firmware, only `patch_sh03.py` (the 48 bytes the
+patch changes).
 
 > ⚠️ **Mains appliance.** Work on it unplugged from mains where you can, and
 > never power it with the screen ribbons (`J1`/`J2`) disconnected — the heater
@@ -32,22 +32,38 @@ The SWD pads are on the screen board at **`P1`**, labelled `3V3 IO CK GND`.
 | SWCLK   | CK  | |
 | 3.3V    | 3V3 | powers the board during flashing |
 
-**You do not need to power the dryer from mains to flash it.** The ST-Link's
-3.3 V (from its own USB) is enough to run the MCU for SWD. That's the easy and
-safe route — nothing is plugged into mains, so the heaters can't fire.
-
-The screen board on its own may hard-fault (the touch task waits on hardware
-that isn't attached). That is irrelevant to flashing — SWD works no matter what
-the firmware is doing. It only matters later, when you *test* injection: that
-needs the dryer fully assembled. If your ST-Link's 3.3 V browns out on the
-board, power the dryer normally instead (screen attached).
+**You do not need to power the dryer from mains.** The ST-Link's 3.3 V (from its
+own USB) is enough to run the MCU for SWD — nothing is plugged into mains, so the
+heaters can't fire. If your ST-Link's 3.3 V browns out on the board, power the
+dryer normally instead (screen attached).
 
 ![SWD header on the screen board](images/pinout/photo_2026-10-11_01-11-17.jpg)
 
-## Flash the patch
+## 1. Dump your stock firmware — keep this, it's your backup
 
 ```bash
-python3 -m pyocd flash -t gd32f303cc firmware/patched/sh03_patched_256k.bin
+python3 -m pyocd cmd -t gd32f303cc -c "savemem 0x08000000 0x40000 sh03_stock.bin"
+```
+
+That writes the first 256 KiB of flash, which is all this part has. **Keep
+`sh03_stock.bin`** — it's your recovery image.
+
+## 2. Patch it
+
+```bash
+python3 firmware/patch_sh03.py sh03_stock.bin
+# -> sh03_stock_patched.bin
+```
+
+The script checks the exact stock bytes it's about to change, so it **fails
+loudly** if your unit is a different firmware revision rather than silently
+corrupting it. (Pass `--force` only if you've verified the offsets against
+[`PROTOCOL.md`](PROTOCOL.md) yourself.)
+
+## 3. Flash
+
+```bash
+python3 -m pyocd flash -t gd32f303cc sh03_stock_patched.bin
 ```
 
 - The target is **`gd32f303cc`** — the CC part (256 KB flash). The `CE` target
@@ -71,30 +87,29 @@ ESP32 does.
 
 ## Recovery — put the original back
 
-If anything goes wrong, restore the untouched dump:
-
 ```bash
-python3 -m pyocd flash -t gd32f303cc firmware/original/sh03_original_256k.bin
+python3 -m pyocd flash -t gd32f303cc sh03_stock.bin
 ```
 
-That file is the first 256 KB of a raw SWD dump (the upper half of the 512 KB
-read is blank `0xFF`). It differs from the patched image only at `0x0b358`
-(the entry stub) and `0x12000`–`0x1202b` (the veneer).
+## What the patch changes
 
-## Side note — rolling your own patch
+| Offset    | Stock                     | Patched            | What |
+|-----------|---------------------------|--------------------|------|
+| `0x0b358` | `80 b5 84 b0`             | `06 f0 52 be`      | touch-read entry → `b.w 0x08012000` |
+| `0x12000` | `ff` × 44                 | `80 b5 84 b0 …`    | veneer: poll UART3 `RBNE`, else fall through to the XW05A I²C read |
 
-If you want to dump *your* unit and patch it yourself (say, a different firmware
-revision), you'll additionally want:
+Applied to a stock V3.5.1 image, the first 256 KiB hashes to
+`f116c9a110905f0fdb1735524d5b306b32993ac0f72b5f65060a7d990805369f`.
 
-- a **CH340** (or any 3.3 V USB-serial adapter) on `J3` for the serial console
-  and for injecting test bytes, and
-- the reverse-engineering notes in [`PROTOCOL.md`](PROTOCOL.md), which document
-  the touch path, the veneer, the key map and the patch addresses.
+## Side note — rolling your own from scratch
 
-The CH340 is a development tool only. End users flashing the ready-made image
-never need one.
+If you want to reverse-engineer a *different* firmware revision yourself, you'll
+additionally want a **CH340** (or any 3.3 V USB-serial adapter) on `J3` for the
+serial console and for injecting test bytes, plus the notes in
+[`PROTOCOL.md`](PROTOCOL.md). The CH340 is a development tool only — end users
+flashing the patched image never need one.
 
 ## ESP32 side
 
 Flashing the ESP32-C3 is a separate, ordinary ESPHome job — see the main
-[README](../README.md#esphome) and [`WIRING.md`](WIRING.md).
+[README](../README.md#flashing) and [`WIRING.md`](WIRING.md).

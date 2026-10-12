@@ -47,16 +47,18 @@ Full detail, connector pinouts and safety notes: **[docs/WIRING.md](docs/WIRING.
 
 ## Flashing
 
-**1 — Dryer firmware.** One-off, via an ST-Link (SWD):
+**1 — Dryer firmware.** One-off, via an ST-Link (SWD). This repo ships no vendor
+firmware — you dump your own unit and patch it:
 
 ```bash
 python3 -m pyocd pack install GD32F303CE
-python3 -m pyocd flash -t gd32f303cc firmware/patched/sh03_patched_256k.bin
+python3 -m pyocd cmd -t gd32f303cc -c "savemem 0x08000000 0x40000 sh03_stock.bin"
+python3 firmware/patch_sh03.py sh03_stock.bin
+python3 -m pyocd flash -t gd32f303cc sh03_stock_patched.bin
 ```
 
-`firmware/original/sh03_original_256k.bin` is the untouched dump for recovery.
-Full step-by-step (including the SWD wiring and how to roll your own patch):
-**[docs/FLASHING.md](docs/FLASHING.md)**.
+Keep `sh03_stock.bin` — it's your recovery image. Full step-by-step (SWD wiring,
+verification, roll-your-own): **[docs/FLASHING.md](docs/FLASHING.md)**.
 
 **2 — ESP32.** Ordinary ESPHome:
 
@@ -104,7 +106,7 @@ Full reverse-engineering notes: **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
 
 ```
 esphome/     sh03-dryer.yaml (working config) + secrets example
-firmware/    original dump (recovery) + the patched image to flash
+firmware/    patch_sh03.py — applies the firmware patch to your own dump
 docs/        WIRING, FLASHING, PROTOCOL, the SH03 manual, photos
 ```
 
@@ -133,12 +135,11 @@ Reverse-engineered, patched and wired by the repo author. Built with
 
 ## Disclaimer
 
-Unaffiliated with Comgrow, Sovol or GigaDevice. Includes a dump of the dryer's
-proprietary firmware for interoperability research only — see [`NOTICE`](NOTICE).
-Modifying and reflashing a mains-powered appliance is done entirely at your own
-risk.
+Unaffiliated with Comgrow, Sovol or GigaDevice. Ships no vendor firmware — just
+a patch script you apply to your own dump; see [`NOTICE`](NOTICE). Modifying and
+reflashing a mains-powered appliance is done entirely at your own risk.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE). Third-party material (vendor firmware, the
-product manual, one retailer photo) is covered by [`NOTICE`](NOTICE), not MIT.
+MIT — see [`LICENSE`](LICENSE). Third-party material (the product manual and one
+retailer photo) is covered by [`NOTICE`](NOTICE), not MIT.

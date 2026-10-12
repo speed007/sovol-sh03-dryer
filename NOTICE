@@ -5,27 +5,33 @@ This repository documents and modifies a Comgrow / Sovol SH03 filament dryer.
 It is not affiliated with, endorsed by, or supported by Comgrow, Sovol, or
 GigaDevice.
 
-Third-party / proprietary material included for interoperability research
--------------------------------------------------------------------------
+No vendor firmware is distributed here
+--------------------------------------
+
+This repository contains **no copy of the dryer's firmware**. What it ships is
+`firmware/patch_sh03.py` — an original script that applies 48 bytes of changes
+to a firmware dump that the user makes from their own device. That patch is the
+author's own work, provided to enable interoperability (controlling the dryer
+from Home Assistant).
+
+The stock firmware the patch targets remains the manufacturer's code. Running
+the script grants no rights to it, and if you redistribute a *patched image*,
+that image contains the manufacturer's code.
+
+Third-party material not covered by the MIT license
+---------------------------------------------------
 
 The MIT license in LICENSE applies to the original code and documentation in
-this repository. The following items are third-party material and are **not**
-covered by the MIT license:
+this repository. The following are third-party material and are **not** covered
+by it:
 
-- `firmware/original/sh03_original_256k.bin` — an unmodified dump of the dryer's
-  stock firmware. This is proprietary code owned by the manufacturer. It is
-  included solely to support interoperability research and to let owners
-  restore their device. Redistribution may be restricted in some jurisdictions;
-  remove this file if you are unsure.
-- `firmware/patched/sh03_patched_256k.bin` — a modified build derived from the
-  stock firmware; the underlying code remains the manufacturer's.
 - `docs/SH03-manual-v1.4.pdf` — the official product manual, copyright of its
   publisher.
 - `docs/images/reference/61EAX0l4M7L._SL1500_.jpg` — a product photo sourced
   from a retailer listing; copyright of its owner.
 
-All product names, logos and brands are the property of their respective
-owners and are used here for identification purposes only.
+All product names, logos and brands are the property of their respective owners
+and are used here for identification purposes only.
 
 Safety
 ------
@@ -33,4 +39,4 @@ Safety
 The SH03 is a mains-powered appliance that generates heat. Reflashing its
 firmware, or powering it with the screen board disconnected, can cause
 unintended heating. Anything you do based on this repository is at your own
-risk. See the safety notes in README.md and docs/PROTOCOL.md.
+risk. See the safety notes in README.md and docs/.
