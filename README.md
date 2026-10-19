@@ -1,5 +1,12 @@
 # Sovol / Comgrow SH03 filament dryer → Home Assistant
 
+> **Disclaimer:** I am not a programmer but use AI for my benefit! If you are ok
+> with it then proceed — or well, not! Also, as I have not yet received any
+> permission to upload patched or original firmware from Sovol/Comgrow, you will
+> have to obtain it by yourself following this guide! As Sovol is very
+> Open-Source friendly they might agree for me to upload it here, so go and
+> convince them!
+
 Control a **stock** Comgrow / Sovol SH03 dual-chamber filament dryer from Home
 Assistant — and, through HA, from Klipper/Moonraker and Spoolman — **without
 replacing the stock firmware and without losing the physical touchscreen.**
