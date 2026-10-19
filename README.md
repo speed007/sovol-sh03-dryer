@@ -168,7 +168,9 @@ Ideas that would genuinely move the project forward:
 - **Robustness.** Better handling of the open-loop state: re-syncing, sanity
   checks, and per-unit tuning of `touch_pulse` / `key_gap`.
 - **Klipper / Spoolman glue.** Home Assistant automations that pick a material
-  from the active spool, mark a spool as "in dryer", and so on.
+  from the active spool, mark a spool as "in dryer", and so on. *(The author
+  already has this in the works, using **NFC tags** on the spools — so there's
+  momentum here to build on.)*
 - **Docs and photos** for other firmware revisions, or a clearer teardown guide.
 
 Pull requests are welcome — small and focused ones are easiest to review. Not
