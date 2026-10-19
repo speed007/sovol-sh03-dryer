@@ -11,7 +11,7 @@ No vendor firmware is distributed here
 This repository contains **no copy of the dryer's firmware**. What it ships is
 `firmware/patch_sh03.py` — an original script that applies 48 bytes of changes
 to a firmware dump that the user makes from their own device. That patch is the
-author's own work, provided to enable interoperability (controlling the dryer
+my own work, provided to enable interoperability (controlling the dryer
 from Home Assistant).
 
 The stock firmware the patch targets remains the manufacturer's code. Running

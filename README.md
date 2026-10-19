@@ -168,9 +168,9 @@ Ideas that would genuinely move the project forward:
 - **Robustness.** Better handling of the open-loop state: re-syncing, sanity
   checks, and per-unit tuning of `touch_pulse` / `key_gap`.
 - **Klipper / Spoolman glue.** Home Assistant automations that pick a material
-  from the active spool, mark a spool as "in dryer", and so on. *(The author
-  already has this in the works, using **NFC tags** on the spools — so there's
-  momentum here to build on.)*
+  from the active spool, mark a spool as "in dryer", and so on. *(I already have
+  this in the works, using **NFC tags** on the spools — so there's momentum here
+  to build on.)*
 - **Docs and photos** for other firmware revisions, or a clearer teardown guide.
 
 Pull requests are welcome — small and focused ones are easiest to review. Not
@@ -178,7 +178,7 @@ sure where to start? Just open an issue and we'll figure it out together.
 
 ## Credits
 
-Reverse-engineered, patched and wired by the repo author. Built with
+Reverse-engineered, patched and wired by me. Built with
 [ESPHome](https://esphome.io/) and [pyOCD](https://pyocd.io/).
 
 ## Disclaimer
