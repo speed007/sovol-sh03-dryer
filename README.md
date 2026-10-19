@@ -29,6 +29,11 @@ drying switches:
 
 *More photos and clips: [`docs/images/`](docs/images/README.md).*
 
+> **Companion project:** [**spoolman-klipper-homeassistant-NFC**](https://github.com/speed007/spoolman-klipper-homeassistant-NFC)
+> — NFC tag spool tagging for Spoolman + Home Assistant: which spool is in which
+> dryer slot, and which spool each toolhead is printing from. This repo drives the
+> dryer; that one tracks what's *in* it.
+
 ## Status
 
 Working. All five panel buttons are drivable from HA; chamber focus, material
@@ -173,9 +178,10 @@ Ideas that would genuinely move the project forward:
 - **Robustness.** Better handling of the open-loop state: re-syncing, sanity
   checks, and per-unit tuning of `touch_pulse` / `key_gap`.
 - **Klipper / Spoolman glue.** Home Assistant automations that pick a material
-  from the active spool, mark a spool as "in dryer", and so on. *(I already have
-  this in the works, using **NFC tags** on the spools — so there's momentum here
-  to build on.)*
+  from the active spool, mark a spool as "in dryer", and so on. The **NFC tag**
+  half of this is done and lives in
+  [spoolman-klipper-homeassistant-NFC](https://github.com/speed007/spoolman-klipper-homeassistant-NFC)
+  — build on it rather than starting again.
 - **Docs and photos** for other firmware revisions, or a clearer teardown guide.
 
 Pull requests are welcome — small and focused ones are easiest to review. Not
