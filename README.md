@@ -19,10 +19,15 @@ before.
 
 ![The SH03 screen board](docs/images/Screen_PCB_Side/photo_2026-10-10_20-18-27.jpg)
 
-[![Working demo — the dryer running, driven from Home Assistant](docs/images/HomeAssistant.jpg)](docs/video/video_2026-10-19_13-37-28.mp4)
+How it looks in Home Assistant — the two chambers, their material selects and the
+drying switches:
 
-*The dashboard above is clickable — it opens the working-demo video. More
-photos and clips: [`docs/images/`](docs/images/README.md).*
+![ESPHome device page — chambers, materials and drying switches](docs/images/HA_Dash2.png)
+![ESPHome device page — the diagnostic / manual keys](docs/images/HA_Dash1.png)
+
+▶ [Working-demo video — the dryer running, driven from Home Assistant](docs/video/video_2026-10-19_13-37-28.mp4)
+
+*More photos and clips: [`docs/images/`](docs/images/README.md).*
 
 ## Status
 

@@ -2,6 +2,13 @@
 
 Media captured while reverse-engineering, wiring and testing the SH03.
 
+## Home Assistant
+
+| File | Shows |
+|---|---|
+| `HA_Dash2.png` | The ESPHome device page — both chambers, material selects and drying switches |
+| `HA_Dash1.png` | The same device page, scrolled to the diagnostic / manual key buttons |
+
 ## Photos
 
 | Folder | Contents |
