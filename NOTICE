@@ -18,10 +18,10 @@ The stock firmware the patch targets remains the manufacturer's code. Running
 the script grants no rights to it, and if you redistribute a *patched image*,
 that image contains the manufacturer's code.
 
-Third-party material not covered by the MIT license
+Third-party material not covered by the MIT licence
 ---------------------------------------------------
 
-The MIT license in LICENSE applies to the original code and documentation in
+The MIT licence in LICENSE applies to the original code and documentation in
 this repository. The following are third-party material and are **not** covered
 by it:
 

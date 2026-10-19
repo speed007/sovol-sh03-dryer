@@ -151,7 +151,7 @@ Unaffiliated with Comgrow, Sovol or GigaDevice. Ships no vendor firmware — jus
 a patch script you apply to your own dump; see [`NOTICE`](NOTICE). Modifying and
 reflashing a mains-powered appliance is done entirely at your own risk.
 
-## License
+## Licence
 
 MIT — see [`LICENSE`](LICENSE). Third-party material (the product manual and one
 retailer photo) is covered by [`NOTICE`](NOTICE), not MIT.

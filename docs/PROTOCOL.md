@@ -237,7 +237,7 @@ assembled.
 
 ### J1/J2 signal names (confirmed from closeup)
 
-**J1** (power / analog / heater / fan / humidity), pins bottom→top:
+**J1** (power / analogue / heater / fan / humidity), pins bottom→top:
 `GND, 5V, MC_HUM_SCL, MC_HUM_SDA, MC_K_FAN1, MC_K_FAN1_FG, MC_K_FAN2,
 MC_K_FAN2_FG, MC_K_FAN3, MC_K_FAN3_FG, MC_HOT1, MC_HOT2, TH1, TH2`
 
