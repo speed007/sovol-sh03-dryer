@@ -10,8 +10,12 @@ touch code for a button, then briefly pulses the touch controller's interrupt
 line to make the dryer "press" that button. Real fingers keep working exactly as
 before.
 
-![SH03 dryer](docs/images/dryer/photo_2026-10-10_19-51-25.jpg)
-![Screen board and J1/J2 ribbons](docs/images/pinout/photo_2026-10-11_01-05-58.jpg)
+![The SH03 screen board](docs/images/Screen_PCB_Side/photo_2026-10-10_20-18-27.jpg)
+
+[![Working demo — the dryer running, driven from Home Assistant](docs/images/HomeAssistant.jpg)](docs/video/video_2026-10-19_13-37-28.mp4)
+
+*The dashboard above is clickable — it opens the working-demo video. More
+photos and clips: [`docs/images/`](docs/images/README.md).*
 
 ## Status
 
@@ -108,7 +112,7 @@ Full reverse-engineering notes: **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
 ```
 esphome/     sh03-dryer.yaml (working config) + secrets example
 firmware/    patch_sh03.py — applies the firmware patch to your own dump
-docs/        WIRING, FLASHING, PROTOCOL, the SH03 manual, photos
+docs/        WIRING, FLASHING, PROTOCOL, the SH03 manual, photos + video
 ```
 
 ## Known issues
