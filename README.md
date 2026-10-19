@@ -140,6 +140,40 @@ docs/        WIRING, FLASHING, PROTOCOL, the SH03 manual, photos + video
 - **No temperature/humidity telemetry yet.** The `J3` console is a printf-only
   debug log with no periodic readings.
 
+## Contributing — please help!
+
+This project works, but it is far from perfect, and it was put together by
+someone learning as they go. **Bug reports, fixes and improvements are very
+welcome.**
+
+The big thing to understand is that **the dryer gives us no feedback.** We only
+*send* touch commands down the `J3` UART — we never read back what the dryer is
+actually doing. Everything the ESP knows (which chamber is focused, which
+material is selected, whether a chamber is running) is tracked in software. So:
+
+- if someone uses the **physical touchscreen**, that tracking drifts out of sync;
+- buttons can occasionally do the wrong thing, or send the wrong number of
+  presses, depending on what state the dryer was really in;
+- the material position and "finishes at" values are estimates, not readings.
+
+If you hit a bug, an odd button behaviour, or a timing that needs tuning on your
+unit, please [open an issue](https://github.com/speed007/sovol-sh03-dryer/issues)
+— even a rough description helps.
+
+Ideas that would genuinely move the project forward:
+
+- **Readback / telemetry.** Anything that lets us *read* the dryer's real state —
+  a second firmware patch that prints the chamber state on `J3` TX, or an I²C tap
+  on the GXHT30 humidity sensor — would remove most of the guesswork.
+- **Robustness.** Better handling of the open-loop state: re-syncing, sanity
+  checks, and per-unit tuning of `touch_pulse` / `key_gap`.
+- **Klipper / Spoolman glue.** Home Assistant automations that pick a material
+  from the active spool, mark a spool as "in dryer", and so on.
+- **Docs and photos** for other firmware revisions, or a clearer teardown guide.
+
+Pull requests are welcome — small and focused ones are easiest to review. Not
+sure where to start? Just open an issue and we'll figure it out together.
+
 ## Credits
 
 Reverse-engineered, patched and wired by the repo author. Built with
