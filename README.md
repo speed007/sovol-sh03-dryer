@@ -196,3 +196,14 @@ reflashing a mains-powered appliance is done entirely at your own risk.
 
 MIT — see [`LICENSE`](LICENSE). Third-party material (the product manual and one
 retailer photo) is covered by [`NOTICE`](NOTICE), not MIT.
+
+## Support
+
+If this project saved you some time, you can buy me a coffee — it's much
+appreciated and keeps the tinkering going.
+
+<p align="center">
+  <a href="https://ko-fi.com/Q2Z82939Y7" target="_blank">
+    <img src="https://storage.ko-fi.com/cdn/kofi5.png?v=6" height="36" alt="Support me on Ko-fi">
+  </a>
+</p>
